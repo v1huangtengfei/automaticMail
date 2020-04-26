@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ideepmind.mail.ModelMapper">
+	
+	<select id="selectAllList" resultType="java.util.HashMap">
+		SELECT
+		  twai.c_war_area_name,
+		  tlai.c_large_area_name,
+		  tai.c_area_name,
+		  tcci.c_customer_id,
+		  tcci.c_customer_name,
+		  tcci.c_customer_moblie_phone_number,
+		  tcci.c_create_time,
+		  tcu.c_real_name,
+		  tsi.c_store_name
+		FROM t_cms_customer_info tcci
+		  LEFT JOIN t_ch_user tcu ON tcu.c_user_id = tcci.c_create_user
+		  LEFT JOIN tb_department_user tdu ON tcu.c_user_id = tdu.c_user_id
+		  LEFT JOIN t_store_infomation tsi ON tdu.c_depte_id=tsi.c_store_id
+		  LEFT JOIN tb_area_info tai ON tai.c_area_id=tsi.c_area_id
+		  LEFT JOIN tb_large_area_info tlai ON tlai.c_large_area_id=tai.c_large_area_id
+		  LEFT JOIN tb_war_area_info twai ON tlai.c_mft_info_id=twai.c_war_area_id
+		 <choose>
+		 	<when test="todayDate != null and todayDate != ''">
+		 		WHERE tcci.c_create_time LIKE CONCAT(#{todayDate},"%")
+		 	</when>
+		 	<otherwise>
+		 		WHERE tcci.c_create_time BETWEEN #{startDate} AND #{endDate}
+		 	</otherwise>
+		 </choose>
+	 	<if test="warAreaId != null and warAreaId != ''">
+	 		AND twai.c_war_area_id = #{warAreaId}
+	 	</if>
+		AND tcci.c_customer_moblie_phone_number IS NOT NULL
+	</select>
+	
+	<select id="selectAllShareList" resultType="java.util.HashMap">
+		SELECT
+			<choose>
+			 	<when test="todayDate != null and todayDate != ''">
+			 		#{todayDate} 
+			 	</when>
+			 	<otherwise>
+			 	CONCAT(
+			 		SUBSTRING_INDEX(#{startDate},' ',1),' 至 ',
+			 		SUBSTRING_INDEX(#{endDate},' ',1)
+			 		 )
+			 	</otherwise>
+			</choose>
+			 nowDate,
+			t.c_war_area_name,
+			t.c_large_area_name,
+			t.c_area_name,
+			t.c_store_name,
+			t.c_real_name,
+			t.c_user_name,
+			t.c_telephone,
+			t.c_sign_in_time,
+			t.shareOne,
+			t.shareTwo,
+			t.nescusNum
+		FROM
+		(
+			SELECT
+				war.c_war_area_name,
+				large.c_large_area_name,
+				area.c_area_name,
+				sto.c_store_name,
+				sale.c_real_name,
+				sale.c_user_name,
+				sale.c_telephone,
+				MAX(appRe.c_sign_in_time) c_sign_in_time,
+				COUNT(DISTINCT IF(ssRe.c_chare_type='1',ssRe.c_id,NULL))  shareOne,
+				COUNT(DISTINCT IF(ssRe.c_chare_type='2',ssRe.c_id,NULL)) shareTwo,
+				COUNT(DISTINCT cmsCus.c_customer_id) nescusNum
+			FROM
+			tb_manufacturer_info AS mf 
+			JOIN tb_war_area_info AS war on(mf.c_mft_info_id='QR8f977c8c2a00b1c157280d'
+				<if test="warAreaId != null and warAreaId != ''">
+			 		AND war.c_war_area_id = #{warAreaId}
+			 	</if>
+			AND mf.c_mft_info_id=war.c_mft_id AND mf.c_is_delete='0' AND war.c_is_delete='0')
+			JOIN tb_large_area_info AS large ON (large.c_mft_info_id=war.c_war_area_id AND large.c_is_delete='0')
+			JOIN tb_area_info AS area ON(area.c_large_area_id=large.c_large_area_id AND area.c_is_delete='0')
+			JOIN t_store_infomation AS sto ON(sto.c_area_id=area.c_area_id AND sto.c_is_delete='0')
+			JOIN tb_department_user AS dept ON(sto.c_store_id=dept.c_depte_id)
+			JOIN t_ch_user AS sale ON(dept.c_user_id=sale.c_user_id AND sale.c_user_type='5' AND sale.c_is_delete='0')
+			LEFT JOIN t_cms_customer_info AS cmsCus ON(sale.c_user_id=cmsCus.c_create_user 
+				<choose>
+				 	<when test="todayDate != null and todayDate != ''">
+				 		AND cmsCus.c_create_time LIKE CONCAT(#{todayDate},"%")
+				 	</when>
+				 	<otherwise>
+				 		 AND cmsCus.c_create_time BETWEEN #{startDate} AND #{endDate}
+				 	</otherwise>
+				 </choose>
+				AND cmsCus.c_customer_is_delete='0'
+				AND cmsCus.c_customer_moblie_phone_number IS NOT NULL AND cmsCus.c_customer_moblie_phone_number!='')
+			LEFT JOIN t_saler_share_record AS ssRe ON(sale.c_user_id=ssRe.c_saler_id 
+				<choose>
+				 	<when test="todayDate != null and todayDate != ''">
+				 		AND ssRe.c_share_time LIKE CONCAT(#{todayDate},"%")
+				 	</when>
+				 	<otherwise>
+				 		 AND ssRe.c_share_time BETWEEN #{startDate} AND #{endDate}
+				 	</otherwise>
+				 </choose>
+			)
+			LEFT JOIN t_saler_app_record AS appRe ON (sale.c_user_id=appRe.c_saler_id 
+				<choose>
+				 	<when test="todayDate != null and todayDate != ''">
+				 		AND appRe.c_sign_in_time LIKE CONCAT(#{todayDate},"%")
+				 	</when>
+				 	<otherwise>
+				 		 AND appRe.c_sign_in_time BETWEEN #{startDate} AND #{endDate}
+				 	</otherwise>
+				 </choose>
+			)
+			GROUP BY war.c_war_area_id,large.c_large_area_id,area.c_area_id,sto.c_store_id,sale.c_user_id
+			ORDER BY war.c_war_area_id,large.c_large_area_id,area.c_area_id,sto.c_store_id,sale.c_user_id
+		) AS t
+	</select>
+</mapper>
